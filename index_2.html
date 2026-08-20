@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>דיווח שעות — DNAidea</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --paper:#FAF7F0; --card:#FFFFFF; --ink:#212B24; --ink-soft:#3E4A41;
+      --muted:#948F7F; --line:#E3DCC9; --accent:#3D6656; --accent-dark:#2B4A3E;
+      --accent-warm:#C98A46; --danger:#B5533D; --vacation:#8B6FB0; --sick:#B5533D; --reserve:#3D6656;
+      --shadow: 0 1px 2px rgba(33,43,36,0.04), 0 8px 24px rgba(33,43,36,0.06);
+    }
+    *{box-sizing:border-box;}
+    html,body{margin:0;padding:0;}
+    body{
+      background: radial-gradient(circle at 15% 8%, rgba(61,102,86,0.05), transparent 40%), var(--paper);
+      color:var(--ink); font-family:'Heebo', sans-serif; min-height:100vh;
+      display:flex; justify-content:center; padding:28px 14px 60px;
+    }
+    .mono{ font-family:'IBM Plex Mono', monospace; }
+    .app{ width:100%; max-width:480px; }
+    .header{ margin-bottom:14px; }
+    .eyebrow{
+      font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.14em;
+      color:var(--accent); text-transform:uppercase; display:flex; align-items:center; gap:8px;
+    }
+    .eyebrow::before{ content:""; width:6px;height:6px;border-radius:50%; background:var(--accent); display:inline-block; }
+    h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:25px; margin:6px 0 2px; }
+    .subhead{ color:var(--muted); font-size:13.5px; }
+    .tabs{ display:flex; gap:6px; margin:14px 0 4px; background:#EFEADB; border-radius:11px; padding:4px; }
+    .tab{ flex:1; text-align:center; padding:9px 0; border-radius:8px; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
+    .tab.active{ background:var(--card); color:var(--accent-dark); box-shadow:var(--shadow); }
+    .date-strip{ display:flex; gap:8px; overflow-x:auto; padding:14px 2px 6px; scrollbar-width:none; }
+    .date-strip::-webkit-scrollbar{ display:none; }
+    .day-pill{ flex:0 0 auto; width:52px; padding:9px 0 8px; border-radius:12px; border:1px solid var(--line); background:var(--card); text-align:center; cursor:pointer; transition:all .15s ease; }
+    .day-pill:hover{ border-color:var(--accent); }
+    .day-pill.selected{ background:var(--accent-dark); border-color:var(--accent-dark); }
+    .day-pill.selected .dow, .day-pill.selected .num{ color:#fff; }
+    .day-pill .dow{ font-size:10.5px; color:var(--muted); }
+    .day-pill .num{ font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:600; color:var(--ink); margin-top:2px; }
+    .day-pill .tally{ font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:var(--accent); margin-top:3px; height:11px; }
+    .day-pill.selected .tally{ color:#DDE9E2; }
+    .day-pill .tally.special{ color:var(--accent-warm); }
+    .day-pill.selected .tally.special{ color:#F3DDC0; }
+    .card{ background:var(--card); border-radius:14px; box-shadow:var(--shadow); border:1px solid var(--line); padding:20px 18px; margin-top:14px; position:relative; overflow:hidden; }
+    .card::before{ content:""; position:absolute; inset:0 0 auto 0; height:4px; background:linear-gradient(90deg,var(--accent),var(--accent-warm)); }
+    .field-label{ font-size:13px; font-weight:600; color:var(--ink-soft); margin-bottom:9px; display:flex; justify-content:space-between; align-items:baseline; }
+    .field-label .hint{ font-weight:400; color:var(--muted); font-size:11.5px; }
+    .seg-row{ display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+    .seg-btn{ flex:1; min-width:75px; border:1px solid var(--line); background:#FCFAF5; color:var(--ink-soft); font-size:12.5px; font-weight:600; padding:9px 6px; border-radius:10px; cursor:pointer; text-align:center; transition:all .15s ease; }
+    .seg-btn.active{ background:var(--accent-dark); border-color:var(--accent-dark); color:#fff; }
+    .seg-btn[data-type="vacation"].active{ background:var(--vacation); border-color:var(--vacation); }
+    .seg-btn[data-type="sick"].active{ background:var(--sick); border-color:var(--sick); }
+    .seg-btn[data-type="reserve"].active{ background:var(--reserve); border-color:var(--reserve); }
+    .office-toggle{ display:flex; align-items:center; justify-content:space-between; background:#FCFAF5; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:16px; }
+    .office-toggle .lbl{ font-size:13px; color:var(--ink-soft); font-weight:600; }
+    .switch{ position:relative; width:44px; height:24px; }
+    .switch input{ opacity:0; width:0; height:0; }
+    .slider{ position:absolute; cursor:pointer; inset:0; background:var(--line); border-radius:24px; transition:.2s; }
+    .slider::before{ content:""; position:absolute; height:18px; width:18px; right:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .switch input:checked + .slider{ background:var(--accent); }
+    .switch input:checked + .slider::before{ transform:translateX(-20px); }
+    .proj-rows{ display:flex; flex-direction:column; gap:10px; margin-bottom:10px; }
+    .proj-row{ display:flex; align-items:center; gap:8px; }
+    .proj-pick{ flex:1; text-align:right; border:1px solid var(--line); background:#FCFAF5; border-radius:10px; padding:10px 12px; font-size:13px; color:var(--ink); cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .proj-pick.placeholder{ color:var(--muted); }
+    .mini-stepper{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    .mini-stepbtn{ width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:#FCFAF5; font-size:16px; color:var(--accent-dark); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .mini-hours{ font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; min-width:30px; text-align:center; }
+    .row-del{ background:none; border:none; color:var(--muted); font-size:15px; cursor:pointer; flex-shrink:0; padding:2px 4px; }
+    .row-del:hover{ color:var(--danger); }
+    .add-row-btn{ background:none; border:1px dashed var(--line); color:var(--accent-dark); font-size:12.5px; font-weight:600; border-radius:10px; padding:9px; cursor:pointer; margin:4px 0 18px; width:100%; }
+    .add-row-btn:hover{ border-color:var(--accent); }
+    .special-block{ margin-bottom:18px; }
+    .special-days-row{ display:flex; align-items:center; gap:12px; }
+    .extras-toggle{ background:none; border:none; color:var(--accent-dark); font-size:13px; font-weight:600; cursor:pointer; padding:4px 0; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+    .extras-toggle .chev{ transition:transform .2s ease; display:inline-block; }
+    .extras-toggle.open .chev{ transform:rotate(180deg); }
+    .extras-body{ max-height:0; overflow:hidden; transition:max-height .25s ease; }
+    .extras-body.open{ max-height:400px; }
+    .extras-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding-top:8px; margin-bottom:8px; }
+    .mini-field label{ font-size:11.5px; color:var(--muted); display:block; margin-bottom:4px; }
+    .mini-field input{ width:100%; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--ink); outline:none; }
+    .mini-field input:focus{ border-color:var(--accent); }
+    .docs-section{ margin-top:4px; margin-bottom:16px; }
+    .doc-add-row{ display:flex; gap:8px; margin-bottom:10px; }
+    .doc-cat-select{ flex:1; border:1px solid var(--line); border-radius:9px; padding:9px 10px; font-size:12.5px; font-family:'Heebo',sans-serif; color:var(--ink); background:#FCFAF5; }
+    .doc-upload-btn{ border:1px dashed var(--accent); background:#F1F6F3; color:var(--accent-dark); border-radius:9px; padding:9px 14px; font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .doc-list{ display:flex; flex-direction:column; gap:6px; }
+    .doc-chip{ display:flex; align-items:center; gap:8px; background:#FCFAF5; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:12.5px; }
+    .doc-chip .cat-tag{ font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:20px; background:var(--accent-dark); color:#fff; flex-shrink:0; }
+    .doc-chip .fname{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-soft); }
+    .doc-chip .doc-del{ background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; }
+    textarea{ width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-family:'Heebo',sans-serif; font-size:13.5px; color:var(--ink); resize:none; min-height:46px; margin-top:2px; margin-bottom:16px; outline:none; }
+    textarea:focus{ border-color:var(--accent); }
+    .submit-btn{ width:100%; background:var(--accent-dark); color:#fff; border:none; border-radius:10px; padding:14px; font-weight:700; font-size:15px; cursor:pointer; transition:transform .1s ease, background .15s ease; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .submit-btn:hover{ background:var(--accent); }
+    .submit-btn:active{ transform:scale(0.98); }
+    .week-strip{ margin-top:22px; }
+    .week-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+    .week-head h2{ font-family:'Frank Ruhl Libre', serif; font-size:16px; margin:0; }
+    .week-total{ font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--accent-dark); font-weight:600; }
+    .week-bars{ display:flex; gap:6px; align-items:flex-end; height:70px; }
+    .week-bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; }
+    .week-bar{ width:100%; background:var(--line); border-radius:5px 5px 2px 2px; position:relative; display:flex; align-items:flex-end; height:44px; }
+    .week-bar-fill{ width:100%; background:var(--accent); border-radius:5px 5px 2px 2px; transition:height .2s ease; }
+    .week-bar-col.selected .week-bar-fill{ background:var(--accent-warm); }
+    .week-bar-lbl{ font-size:10px; color:var(--muted); }
+    .month-hero{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px; }
+    .month-hero .big{ font-family:'IBM Plex Mono',monospace; font-size:38px; font-weight:600; color:var(--ink); }
+    .month-hero .big span{ font-size:16px; color:var(--muted); margin-right:4px; }
+    .month-hero .lbl{ font-size:12.5px; color:var(--muted); text-align:left; }
+    .chips-row{ display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+    .stat-chip{ background:#FCFAF5; border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:12px; color:var(--ink-soft); }
+    .stat-chip b{ font-family:'IBM Plex Mono',monospace; color:var(--ink); font-size:13px; }
+    .bar-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
+    .bar-item .bar-top{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px; }
+    .bar-item .bar-top .pname{ color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:75%; }
+    .bar-item .bar-top .pval{ font-family:'IBM Plex Mono',monospace; color:var(--accent-dark); font-weight:600; flex-shrink:0; }
+    .bar-track{ height:7px; background:#EFEADB; border-radius:4px; overflow:hidden; }
+    .bar-fill{ height:100%; background:var(--accent); border-radius:4px; }
+    .month-days{ display:flex; flex-direction:column; gap:4px; margin-top:6px; max-height:280px; overflow-y:auto; }
+    .month-day-row{ display:flex; align-items:center; gap:10px; padding:7px 4px; border-bottom:1px dashed var(--line); font-size:12.5px; cursor:pointer; }
+    .month-day-row:hover{ background:#FCFAF5; }
+    .mdr-date{ font-family:'IBM Plex Mono',monospace; width:66px; flex-shrink:0; color:var(--muted); }
+    .mdr-status{ width:18px; text-align:center; flex-shrink:0; }
+    .mdr-status.ok{ color:var(--accent); }
+    .mdr-status.warn{ color:var(--danger); }
+    .mdr-status.off{ color:var(--line); }
+    .mdr-desc{ flex:1; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .mdr-hrs{ font-family:'IBM Plex Mono',monospace; color:var(--ink); flex-shrink:0; }
+    .review-banner{ margin-top:18px; border:1px solid var(--line); border-radius:12px; padding:16px; background:#FCFAF5; }
+    .review-banner.reviewed{ background:#F1F6F3; border-color:var(--accent); }
+    .review-banner h3{ font-family:'Frank Ruhl Libre',serif; font-size:15.5px; margin:0 0 6px; }
+    .review-banner p{ font-size:12.5px; color:var(--muted); margin:0 0 12px; line-height:1.6; }
+    .review-btn{ width:100%; background:var(--accent-dark); color:#fff; border:none; border-radius:9px; padding:11px; font-weight:700; font-size:13.5px; cursor:pointer; }
+    .review-badge{ font-size:12.5px; color:var(--accent-dark); font-weight:600; }
+    .modal-bg{ position:fixed; inset:0; background:rgba(33,43,36,0.45); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+    .modal-bg.open{ display:flex; }
+    .modal{ background:var(--card); width:100%; max-width:480px; border-radius:18px 18px 0 0; padding:18px 18px 24px; max-height:70vh; display:flex; flex-direction:column; }
+    .modal h3{ font-family:'Frank Ruhl Libre',serif; font-size:17px; margin:0 0 12px; }
+    .modal-search{ width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:13px; font-family:'Heebo',sans-serif; margin-bottom:10px; outline:none; }
+    .modal-search:focus{ border-color:var(--accent); }
+    .modal-list{ overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+    .modal-item{ padding:11px 12px; border-radius:9px; border:1px solid var(--line); font-size:13px; cursor:pointer; }
+    .modal-item:hover{ background:#FCFAF5; border-color:var(--accent); }
+    .modal-close{ text-align:center; margin-top:12px; color:var(--muted); font-size:12.5px; cursor:pointer; }
+    .toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; font-size:13px; padding:11px 20px; border-radius:30px; opacity:0; transition:all .25s ease; pointer-events:none; }
+    .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+    .footnote{ margin-top:24px; text-align:center; font-size:11.5px; color:var(--muted); line-height:1.6; }
+    .footnote b{ color:var(--ink-soft); }
+    #dayView, #monthView{ display:none; }
+    #dayView.active, #monthView.active{ display:block; }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="header">
+        <div class="eyebrow">DNAidea · דיווח שעות</div>
+        <h1>היומן שלי</h1>
+      <div class="subhead"><span id="empNameLbl">שקד גרינבאום</span> · <span id="selDateLbl" class="mono"></span></div>
+      </div>
+    <div class="tabs">
+    <div class="tab active" data-tab="day">היום</div>
+    <div class="tab" data-tab="month">החודש שלי</div>
+    </div>
+    <!-- DAY VIEW -->
+    <div id="dayView" class="active">
+    <div class="date-strip" id="dateStrip"></div>
+    <div class="card">
+    <div class="field-label">סוג היום</div>
+    <div class="seg-row" id="segRow">
+    <div class="seg-btn active" data-type="work">יום עבודה</div>
+    <div class="seg-btn" data-type="vacation">חופשה</div>
+    <div class="seg-btn" data-type="sick">מחלה</div>
+    <div class="seg-btn" data-type="reserve">מילואים</div>
+    </div>
+    <div class="office-toggle">
+    <span class="lbl">הגעתי למשרד היום</span>
+    <label class="switch"><input type="checkbox" id="officeToggle"><span class="slider"></span></label>
+    </div>
+    <div id="workBlock">
+    <div class="field-label">פרויקטים ושעות</div>
+    <div class="proj-rows" id="projRows"></div>
+    <button class="add-row-btn" id="addRowBtn">+ הוסף פרויקט נוסף באותו יום</button>
+    <button class="extras-toggle" id="extrasToggle"><span class="chev">▾</span> נסיעות והחזרי הוצאות</button>
+    <div class="extras-body" id="extrasBody">
+    <div class="extras-grid">
+    <div class="mini-field"><label>נסיעה ברכב (ק״מ)</label><input type="number" id="carKm" min="0" step="1" value="0"></div>
+    <div class="mini-field"><label>תחב״צ (₪)</label><input type="number" id="transitILS" min="0" step="1" value="0"></div>
+    <div class="mini-field"><label>החזר הוצאות אחר (₪)</label><input type="number" id="expenseILS" min="0" step="1" value="0"></div>
+    </div>
+    </div>
+    </div>
+    <div id="specialBlock" class="special-block" style="display:none">
+    <div class="field-label">כמה ימים?</div>
+    <div class="special-days-row">
+    <div class="mini-stepper">
+    <button class="mini-stepbtn" id="specialMinus">–</button>
+    <div class="mini-hours mono" id="specialDaysVal">1</div>
+    <button class="mini-stepbtn" id="specialPlus">+</button>
+    </div>
+    <span style="font-size:12.5px;color:var(--muted)">ימים בסטטוס זה, החל מהתאריך שנבחר</span>
+    </div>
+    </div>
+    <div class="field-label" style="margin-top:4px">מסמכים <span class="hint">מילואים / חשבוניות / אישור מחלה</span></div>
+    <div class="docs-section">
+    <div class="doc-add-row">
+    <select class="doc-cat-select" id="docCat">
+    <option value="מילואים">מילואים</option>
+    <option value="חשבונית להחזר הוצאות">חשבונית להחזר הוצאות</option>
+    <option value="אישור מחלה">אישור מחלה</option>
+    <option value="אחר">אחר</option>
+    </select>
+    <label class="doc-upload-btn">+ העלאת קובץ<input type="file" id="docFile" style="display:none"></label>
+    </div>
+    <div class="doc-list" id="docList"></div>
+    </div>
+    <textarea id="noteInput" placeholder="הערה ליום (לא חובה)"></textarea>
+    <button class="submit-btn" id="submitBtn">✓ שמור יום</button>
+    </div>
+    <div class="week-strip">
+    <div class="week-head"><h2>השבוע</h2><div class="week-total mono" id="weekTotal">0.0 ש׳</div></div>
+    <div class="week-bars" id="weekBars"></div>
+    </div>
+    </div>
+    <!-- MONTH VIEW -->
+    <div id="monthView">
+    <div class="card">
+    <div class="month-hero">
+    <div><div class="big" id="monthTotal">0.0<span>שעות</span></div></div>
+    <div style="text-align:left">
+    <div class="lbl" id="monthLbl">יולי 2026</div>
+    <div style="display:flex;gap:4px;margin-top:6px;justify-content:flex-end">
+    <button id="prevMonthBtn" style="border:1px solid var(--line);background:#FCFAF5;border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:13px;color:var(--accent-dark)">›</button>
+    <button id="nextMonthBtn" style="border:1px solid var(--line);background:#FCFAF5;border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:13px;color:var(--accent-dark)">‹</button>
+    </div>
+    </div>
+    </div>
+    <div class="chips-row" id="monthChips"></div>
+    <div class="field-label">שעות לפי פרויקט</div>
+    <div class="bar-list" id="projBreakdown"></div>
+    </div>
+    <div class="card">
+    <div class="field-label">כל הימים בחודש</div>
+    <div class="month-days" id="monthDays"></div>
+    </div>
+    <div class="review-banner" id="reviewBanner">
+    <h3 id="reviewTitle">בקרה לפני משיכת נתונים לשכר</h3>
+    <p id="reviewText">עברת על כל הימים? זה לא "הגשה" רשמית — זה רק סימון אישי שבדקת שהכל נכון, לפני שהנתונים נמשכים לתלוש.</p>
+    <button class="review-btn" id="reviewBtn">✓ בדקתי, הכל תקין</button>
+    </div>
+    </div>
+    <div class="footnote">
+    <b>מערכת שעות DNAidea.</b> שעות, פרויקטים ומסמכים נשמרים ישירות ב-Sheets ובדרייב של הארגון.
+    </div>
+    </div>
+  <div class="modal-bg" id="modalBg">
+  <div class="modal">
+  <h3>בחר פרויקט</h3>
+  <input class="modal-search" id="modalSearch" placeholder="חיפוש…">
+  <div class="modal-list" id="modalList"></div>
+  <div class="modal-close" id="modalClose">ביטול</div>
+  </div>
+  </div>
+  <div class="toast" id="toast">היום נשמר ✓</div>
+  <script>
+    // ---- live backend ----
+    const BACKEND_URL = "https://script.google.com/a/macros/dnaidea.co.il/s/AKfycbzqgObQSV0MwWo9JWMr6u19gAWxsRwaxHcirAud76XXc-ynceuNRBW3NTTwOFxxE096dQ/exec";
+    const urlParams = new URLSearchParams(window.location.search);
+    const STORAGE_KEY = 'dnaidea_emp_name';
+    let EMPLOYEE_NAME = urlParams.get('emp') || '';
+    if (EMPLOYEE_NAME) {
+      try { localStorage.setItem(STORAGE_KEY, EMPLOYEE_NAME); } catch(e){}
+    } else {
+      try { EMPLOYEE_NAME = localStorage.getItem(STORAGE_KEY) || ''; } catch(e){}
+    }
+    if (!EMPLOYEE_NAME) EMPLOYEE_NAME = "שקד גרינבאום";
+    let PROJECTS = [
+      "שער הנגב - תכנית אסטרטגית לתחום החינוך (קרן הביתה)",
+      "תשכיל- עראבה",
+      "מחקר הערכה - שירות לאומי אזרחי ענפי",
+      "אנו/מרכז קורת - מחקר הערכת אימפקט",
+      "מינהלת זהות יהודית - מכרז אסטרטגיה ושיתוף ציבור",
+      "המשרד לבט\"פ - תהליכי שיתוף ציבור",
+      "משרד הבריאות- מניעת אובדנות יוצאי אתיופיה",
+      "ג'וינט-אלכא - כתיבת תיקי פרויקט מניבים",
+      "מידול כניסת יועצים לפיתוח כלכלי ברשויות",
+      "מנומדין - אופקים 2",
+      "משרד הפנים - בדואים דרום",
+      "מיפוי פילנתרופיה- נפש בנפש",
+      "מ.א אשכול - כנס ת.עבודה בספטמבר"
+      ];
+    async function loadProjectsFromBackend(){
+      try {
+        const res = await fetch(`${BACKEND_URL}?action=getProjects`);
+        const data = await res.json();
+        if (Array.isArray(data) && data.length){
+          PROJECTS = data.map(p => p.name);
+          renderProjRows();
+        }
+      } catch(err){
+        console.warn('לא הצלחתי לטעון פרויקטים מה-Sheet, משתמש ברשימה מקומית', err);
+      }
+    }
+    const DOW = ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"];
+    const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+    function fmt(d){ return d.toISOString().slice(0,10); }
+    function todayMid(){ const t=new Date(); t.setHours(0,0,0,0); return t; }
+    const TODAY = todayMid();
+    const records = {};
+    let selectedDate = fmt(TODAY);
+    let activeRowIndexForModal = null;
+    let monthReviewed = null;
+    let viewMonthDate = new Date(TODAY);
+    const loadedMonths = new Set();
+    document.querySelectorAll('.tab').forEach(t=>{
+      t.onclick = () => {
+        document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x===t));
+        document.getElementById('dayView').classList.toggle('active', t.dataset.tab==='day');
+        document.getElementById('monthView').classList.toggle('active', t.dataset.tab==='month');
+        if(t.dataset.tab==='month') renderMonthView();
+      };
+    });
+    const dateStrip = document.getElementById('dateStrip');
+    function renderDateStrip(){
+      dateStrip.innerHTML = "";
+      for(let i=0;i<21;i++){
+        const d = new Date(TODAY); d.setDate(d.getDate()-i);
+        const key = fmt(d);
+        const pill = document.createElement('div');
+        pill.className = 'day-pill' + (key===selectedDate ? ' selected':'');
+        const rec = records[key];
+        let tallyHtml = '<div class="tally">&nbsp;</div>';
+        if(rec){
+          if(rec.type==='work'){
+            const total = rec.projects.reduce((s,p)=>s+p.hours,0);
+            if(total>0) tallyHtml = `<div class="tally">${total.toFixed(1).replace(/\.0$/,'')}</div>`;
+          } else {
+            const lbl = {vacation:'חופ׳',sick:'מחל׳',reserve:'מיל׳'}[rec.type];
+            tallyHtml = `<div class="tally special">${lbl}</div>`;
+          }
+        }
+        pill.innerHTML = `<div class="dow">${DOW[d.getDay()]}</div><div class="num mono">${d.getDate()}</div>${tallyHtml}`;
+        pill.onclick = () => { selectedDate = key; loadDay(); renderDateStrip(); };
+        dateStrip.appendChild(pill);
+      }
+      document.getElementById('selDateLbl').textContent = new Date(selectedDate).toLocaleDateString('he-IL',{weekday:'long', day:'numeric', month:'long'});
+    }
+    const segRow = document.getElementById('segRow');
+    let currentType = 'work';
+    segRow.querySelectorAll('.seg-btn').forEach(btn=>{
+      btn.onclick = () => {
+        currentType = btn.dataset.type;
+        segRow.querySelectorAll('.seg-btn').forEach(b=>b.classList.toggle('active', b===btn));
+        document.getElementById('workBlock').style.display = currentType==='work' ? 'block':'none';
+        document.getElementById('specialBlock').style.display = currentType==='work' ? 'none':'block';
+        const catMap = {vacation:'אחר', sick:'אישור מחלה', reserve:'מילואים', work:'חשבונית להחזר הוצאות'};
+        document.getElementById('docCat').value = catMap[currentType];
+      };
+    });
+    let projRowsData = [{project:null, hours:0}];
+    const projRowsEl = document.getElementById('projRows');
+    function renderProjRows(){
+      projRowsEl.innerHTML = "";
+      projRowsData.forEach((row, idx) => {
+        const el = document.createElement('div');
+        el.className = 'proj-row';
+        el.innerHTML = `
+        <div class="proj-pick ${row.project ? '' : 'placeholder'}" data-idx="${idx}">${row.project || 'בחר פרויקט…'}</div>
+        <div class="mini-stepper">
+        <button class="mini-stepbtn minus" data-idx="${idx}">–</button>
+        <div class="mini-hours mono">${row.hours.toFixed(1).replace(/\.0$/,'')}</div>
+        <button class="mini-stepbtn plus" data-idx="${idx}">+</button>
+        </div>
+        ${projRowsData.length>1 ? `<button class="row-del" data-idx="${idx}">✕</button>` : ''}
+        `;
+        projRowsEl.appendChild(el);
+      });
+      projRowsEl.querySelectorAll('.proj-pick').forEach(elx=>{ elx.onclick = () => openModal(parseInt(elx.dataset.idx)); });
+      projRowsEl.querySelectorAll('.minus').forEach(b=> b.onclick = () => { projRowsData[b.dataset.idx].hours = Math.max(0, projRowsData[b.dataset.idx].hours-0.5); renderProjRows(); });
+      projRowsEl.querySelectorAll('.plus').forEach(b=> b.onclick = () => { projRowsData[b.dataset.idx].hours = Math.min(12, projRowsData[b.dataset.idx].hours+0.5); renderProjRows(); });
+      projRowsEl.querySelectorAll('.row-del').forEach(b=> b.onclick = () => { projRowsData.splice(b.dataset.idx,1); renderProjRows(); });
+    }
+    document.getElementById('addRowBtn').onclick = () => { projRowsData.push({project:null, hours:0}); renderProjRows(); };
+    renderProjRows();
+    const modalBg = document.getElementById('modalBg');
+    const modalList = document.getElementById('modalList');
+    const modalSearch = document.getElementById('modalSearch');
+    function openModal(idx){
+      activeRowIndexForModal = idx;
+      modalSearch.value = "";
+      renderModalList("");
+      modalBg.classList.add('open');
+      setTimeout(()=>modalSearch.focus(), 50);
+    }
+  function renderModalList(filter){
+  modalList.innerHTML = "";
+  PROJECTS.filter(p=>p.toLowerCase().includes(filter.toLowerCase())).forEach(p=>{
+  const item = document.createElement('div');
+  item.className = 'modal-item';
+  item.textContent = p;
+  item.onclick = () => { projRowsData[activeRowIndexForModal].project = p; renderProjRows(); modalBg.classList.remove('open'); };
+  modalList.appendChild(item);
+  });
+  }
+  modalSearch.addEventListener('input', e=>renderModalList(e.target.value));
+  document.getElementById('modalClose').onclick = () => modalBg.classList.remove('open');
+  modalBg.onclick = (e) => { if(e.target===modalBg) modalBg.classList.remove('open'); };
+  const extrasToggle = document.getElementById('extrasToggle');
+  const extrasBody = document.getElementById('extrasBody');
+  extrasToggle.onclick = () => { extrasToggle.classList.toggle('open'); extrasBody.classList.toggle('open'); };
+  let specialDays = 1;
+  const specialDaysVal = document.getElementById('specialDaysVal');
+  document.getElementById('specialMinus').onclick = () => { specialDays = Math.max(1, specialDays-1); specialDaysVal.textContent = specialDays; };
+  document.getElementById('specialPlus').onclick = () => { specialDays = Math.min(14, specialDays+1); specialDaysVal.textContent = specialDays; };
+  let docsData = [];
+  const docList = document.getElementById('docList');
+  const docFile = document.getElementById('docFile');
+  docFile.addEventListener('change', () => {
+  if(!docFile.files.length) return;
+  const file = docFile.files[0];
+  const cat = document.getElementById('docCat').value;
+  const reader = new FileReader();
+  reader.onload = async () => {
+  const base64 = reader.result.split(',')[1];
+  try {
+  const res = await fetch(BACKEND_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+  body: JSON.stringify({ action:'uploadDoc', employee: EMPLOYEE_NAME, date: selectedDate, category: cat, filename: file.name, mimeType: file.type||'application/octet-stream', base64Content: base64 })
+  });
+  const result = await res.json();
+  if (result.error) throw new Error(result.error);
+  docsData.push({ name: file.name, cat: cat, url: result.fileUrl });
+  renderDocs();
+  showSaveToast('הקובץ הועלה לדרייב ✓', false);
+  } catch(err){
+  console.error('העלאת קובץ נכשלה', err);
+  showSaveToast('העלאת הקובץ נכשלה, נסה שוב', true);
+  }
+  docFile.value = "";
+  };
+  reader.readAsDataURL(file);
+  });
+  function renderDocs(){
+  docList.innerHTML = "";
+  docsData.forEach((d, idx) => {
+  const chip = document.createElement('div');
+  chip.className = 'doc-chip';
+  chip.innerHTML = `<span class="cat-tag">${d.cat}</span><span class="fname">${d.name}</span><button class="doc-del" data-idx="${idx}">✕</button>`;
+  docList.appendChild(chip);
+  });
+  docList.querySelectorAll('.doc-del').forEach(b => b.onclick = () => { docsData.splice(b.dataset.idx,1); renderDocs(); });
+  }
+  function loadDay(){
+  const rec = records[selectedDate];
+  if(rec){
+  currentType = rec.type;
+  projRowsData = rec.type==='work' ? JSON.parse(JSON.stringify(rec.projects.length?rec.projects:[{project:null,hours:0}])) : [{project:null,hours:0}];
+  document.getElementById('carKm').value = rec.carKm||0;
+  document.getElementById('transitILS').value = rec.transitILS||0;
+  document.getElementById('expenseILS').value = rec.expenseILS||0;
+  document.getElementById('noteInput').value = rec.note||"";
+  document.getElementById('officeToggle').checked = !!rec.officeToday;
+  specialDays = rec.specialDays||1;
+  docsData = rec.docs ? JSON.parse(JSON.stringify(rec.docs)) : [];
+  } else {
+  currentType = 'work';
+  projRowsData = [{project:null, hours:0}];
+  document.getElementById('carKm').value = 0;
+  document.getElementById('transitILS').value = 0;
+  document.getElementById('expenseILS').value = 0;
+  document.getElementById('noteInput').value = "";
+  document.getElementById('officeToggle').checked = false;
+  specialDays = 1;
+  docsData = [];
+  }
+  specialDaysVal.textContent = specialDays;
+  segRow.querySelectorAll('.seg-btn').forEach(b=>b.classList.toggle('active', b.dataset.type===currentType));
+  document.getElementById('workBlock').style.display = currentType==='work' ? 'block':'none';
+  document.getElementById('specialBlock').style.display = currentType==='work' ? 'none':'block';
+  renderProjRows();
+  renderDocs();
+  }
+  document.getElementById('submitBtn').onclick = async () => {
+  const dayRecord = {
+  type: currentType,
+  projects: currentType==='work' ? projRowsData.filter(r=>r.project && r.hours>0) : [],
+  officeToday: document.getElementById('officeToggle').checked,
+  carKm: parseFloat(document.getElementById('carKm').value)||0,
+  transitILS: parseFloat(document.getElementById('transitILS').value)||0,
+  expenseILS: parseFloat(document.getElementById('expenseILS').value)||0,
+  note: document.getElementById('noteInput').value.trim(),
+  specialDays: specialDays,
+  docs: JSON.parse(JSON.stringify(docsData))
+  };
+  records[selectedDate] = dayRecord;
+  monthReviewed = null;
+  renderDateStrip(); renderWeekStrip();
+  const submitBtn = document.getElementById('submitBtn');
+  const originalLabel = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '⏳ שומר ל-Sheet...';
+  try {
+  const res = await fetch(BACKEND_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+  body: JSON.stringify({
+  action: 'saveDay',
+  employee: EMPLOYEE_NAME,
+  date: selectedDate,
+  dayType: dayRecord.type,
+  projects: dayRecord.projects,
+  officeToday: dayRecord.officeToday,
+  carKm: dayRecord.carKm,
+  transitILS: dayRecord.transitILS,
+  expenseILS: dayRecord.expenseILS,
+  specialDays: dayRecord.specialDays,
+  note: dayRecord.note
+  })
+  });
+  const result = await res.json();
+  if (result.error) throw new Error(result.error);
+  showSaveToast('היום נשמר ב-Sheet ✓', false);
+  } catch (err) {
+  console.error('שמירה נכשלה', err);
+  showSaveToast('השמירה נכשלה — נסה שוב או בדוק חיבור', true);
+  } finally {
+  submitBtn.disabled = false;
+  submitBtn.innerHTML = originalLabel;
+  }
+  };
+  function showSaveToast(msg, isError){
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.background = isError ? 'var(--danger)' : 'var(--ink)';
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), isError ? 2600 : 1400);
+  }
+  const weekBars = document.getElementById('weekBars');
+  const weekTotal = document.getElementById('weekTotal');
+  function renderWeekStrip(){
+  const sel = new Date(selectedDate);
+  const sunday = new Date(sel); sunday.setDate(sel.getDate()-sel.getDay());
+  weekBars.innerHTML = "";
+  let total = 0;
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(sunday); d.setDate(sunday.getDate()+i);
+    const key = fmt(d);
+    const rec = records[key];
+    const hrs = rec && rec.type==='work' ? rec.projects.reduce((s,p)=>s+p.hours,0) : 0;
+    total += hrs;
+    days.push({d,key,hrs,rec});
+    }
+    const maxH = Math.max(8, ...days.map(x=>x.hrs));
+    days.forEach(({d,key,hrs,rec})=>{
+    const col = document.createElement('div');
+    col.className = 'week-bar-col' + (key===selectedDate?' selected':'');
+    const pct = hrs>0 ? Math.max(10,(hrs/maxH)*100) : 0;
+    col.innerHTML = `
+    <div class="week-bar"><div class="week-bar-fill" style="height:${pct}%"></div></div>
+    <div class="week-bar-lbl mono">${rec && rec.type!=='work' ? {vacation:'ח',sick:'מ',reserve:'מל'}[rec.type] : (hrs>0?hrs.toFixed(1).replace(/\.0$/,''):'')}</div>
+    <div class="week-bar-lbl">${DOW[d.getDay()]}</div>
+    `;
+    col.onclick = () => { selectedDate = key; loadDay(); renderDateStrip(); renderWeekStrip(); };
+    weekBars.appendChild(col);
+    });
+    weekTotal.textContent = total.toFixed(1).replace(/\.0$/,'') + ' ש׳';
+    }
+    async function fetchEmployeeMonth(monthKey){
+    if(loadedMonths.has(monthKey)) return;
+    loadedMonths.add(monthKey);
+    try {
+    const res = await fetch(`${BACKEND_URL}?action=getEmployeeTimesheet&emp=${encodeURIComponent(EMPLOYEE_NAME)}&month=${monthKey}`);
+    const rows = await res.json();
+    if(!Array.isArray(rows)) return;
+    const byDate = {};
+    rows.forEach(r=>{
+    if(!byDate[r.date]) byDate[r.date] = { type:r.dayType, projects:[], officeToday:r.office==='כן', carKm:parseFloat(r.km)||0, transitILS:parseFloat(r.transit)||0, expenseILS:parseFloat(r.expense)||0, specialDays:(parseFloat(r.vacationDays)||parseFloat(r.sickDays)||parseFloat(r.reserveDays)||1), note:r.note||'', docs:[] };
+    if(r.dayType==='work' && r.project){
+    byDate[r.date].projects.push({ project:r.project, hours:parseFloat(r.hours)||0 });
+    }
+    });
+    Object.keys(byDate).forEach(k=>{ if(!records[k]) records[k] = byDate[k]; });
+    } catch(err){
+    console.warn('לא הצלחתי לטעון היסטוריית דיווחים', err);
+    loadedMonths.delete(monthKey);
+    }
+    }
+    document.getElementById('prevMonthBtn').onclick = async () => {
+    viewMonthDate.setMonth(viewMonthDate.getMonth()-1);
+    await fetchEmployeeMonth(monthKeyOf(viewMonthDate));
+    renderMonthView();
+    };
+    document.getElementById('nextMonthBtn').onclick = async () => {
+    viewMonthDate.setMonth(viewMonthDate.getMonth()+1);
+    await fetchEmployeeMonth(monthKeyOf(viewMonthDate));
+    renderMonthView();
+    };
+    function monthKeyOf(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+    function renderMonthView(){
+    const ref = viewMonthDate;
+    const y = ref.getFullYear(), m = ref.getMonth();
+    document.getElementById('monthLbl').textContent = `${MONTHS[m]} ${y}`;
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    let totalHrs=0, vac=0, sick=0, res=0, officeDays=0, expenses=0;
+    const projTotals = {};
+    const dayRows = [];
+    for(let day=1; day<=daysInMonth; day++){
+      const d = new Date(y,m,day);
+      const key = fmt(d);
+      const rec = records[key];
+      const isFuture = d > TODAY;
+      const isWeekend = d.getDay()===5 || d.getDay()===6;
+      let status='off', desc='—', hrs='';
+      if(rec){
+      if(rec.officeToday) officeDays++;
+      expenses += (rec.carKm?rec.carKm*0:0);
+      expenses += (rec.transitILS||0) + (rec.expenseILS||0);
+      if(rec.type==='work'){
+      const h = rec.projects.reduce((s,p)=>s+p.hours,0);
+      totalHrs += h;
+      rec.projects.forEach(p=>{ projTotals[p.project] = (projTotals[p.project]||0)+p.hours; });
+      status = h>0 ? 'ok' : (isFuture?'off':'warn');
+      desc = rec.projects.map(p=>p.project.split(' - ')[0]).join(', ') || '—';
+      hrs = h>0 ? h.toFixed(1).replace(/\.0$/,'')+' ש׳' : '';
+      } else {
+      const cnt = rec.specialDays||1;
+      if(rec.type==='vacation') vac+=cnt; if(rec.type==='sick') sick+=cnt; if(rec.type==='reserve') res+=cnt;
+      status='ok';
+      desc = {vacation:'חופשה',sick:'מחלה',reserve:'מילואים'}[rec.type];
+      }
+      } else if(!isFuture && !isWeekend){
+      status='warn'; desc='לא דווח';
+      }
+      dayRows.push({key,d,status,desc,hrs});
+      }
+      document.getElementById('monthTotal').innerHTML = totalHrs.toFixed(1).replace(/\.0$/,'') + '<span>שעות</span>';
+    const chips = document.getElementById('monthChips');
+    chips.innerHTML = `
+    <div class="stat-chip">ימי משרד: <b>${officeDays}</b></div>
+    <div class="stat-chip">חופשה: <b>${vac}</b></div>
+    <div class="stat-chip">מחלה: <b>${sick}</b></div>
+    <div class="stat-chip">מילואים: <b>${res}</b></div>
+    <div class="stat-chip">הוצאות: <b>₪${expenses.toFixed(0)}</b></div>
+    `;
+    const bl = document.getElementById('projBreakdown');
+    const maxP = Math.max(1, ...Object.values(projTotals));
+    const sorted = Object.entries(projTotals).sort((a,b)=>b[1]-a[1]);
+    bl.innerHTML = sorted.length ? sorted.map(([name,hrs])=>`
+    <div class="bar-item">
+    <div class="bar-top"><span class="pname">${name}</span><span class="pval mono">${hrs.toFixed(1).replace(/\.0$/,'')} ש׳</span></div>
+    <div class="bar-track"><div class="bar-fill" style="width:${(hrs/maxP)*100}%"></div></div>
+    </div>
+    `).join('') : '<div style="color:var(--muted);font-size:12.5px;">אין עדיין דיווחים החודש</div>';
+    const mdays = document.getElementById('monthDays');
+    mdays.innerHTML = dayRows.slice().reverse().map(r=>{
+    const icon = r.status==='ok' ? '✓' : r.status==='warn' ? '!' : '·';
+    return `<div class="month-day-row" data-key="${r.key}">
+    <div class="mdr-date mono">${r.d.getDate()}/${r.d.getMonth()+1}</div>
+    <div class="mdr-status ${r.status}">${icon}</div>
+    <div class="mdr-desc">${r.desc}</div>
+    <div class="mdr-hrs">${r.hrs}</div>
+    </div>`;
+    }).join('');
+    mdays.querySelectorAll('.month-day-row').forEach(row=>{
+    row.onclick = () => {
+    selectedDate = row.dataset.key; loadDay(); renderDateStrip(); renderWeekStrip();
+    document.querySelector('.tab[data-tab="day"]').click();
+    };
+    });
+    const missing = dayRows.filter(r=>r.status==='warn').length;
+    const banner = document.getElementById('reviewBanner');
+    const btn = document.getElementById('reviewBtn');
+    if(monthReviewed){
+    banner.classList.add('reviewed');
+    document.getElementById('reviewTitle').textContent = 'נבדק ✓';
+    document.getElementById('reviewText').innerHTML = `סימנת שבדקת את ${MONTHS[m]} ב-<span class="review-badge">${monthReviewed}</span>. עדיין אפשר לערוך ימים — הסימון רק עוזר לשקד לדעת שהחודש מוכן למשיכה לשכר.`;
+    btn.textContent = 'בטל סימון';
+    } else {
+    banner.classList.remove('reviewed');
+    document.getElementById('reviewTitle').textContent = missing>0 ? `בקרה — ${missing} ימים ללא דיווח` : 'בקרה לפני משיכת נתונים לשכר';
+    document.getElementById('reviewText').textContent = 'עברת על כל הימים? זה לא "הגשה" רשמית — זה רק סימון אישי שבדקת שהכל נכון, לפני שהנתונים נמשכים לתלוש.';
+    btn.textContent = '✓ בדקתי, הכל תקין';
+    }
+    btn.onclick = () => {
+    monthReviewed = monthReviewed ? null : new Date().toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'});
+    renderMonthView();
+    };
+    }
+    document.getElementById('empNameLbl').textContent = EMPLOYEE_NAME;
+    (async function boot(){
+      const prevMonthDate = new Date(TODAY); prevMonthDate.setMonth(prevMonthDate.getMonth()-1);
+      await Promise.all([
+        fetchEmployeeMonth(monthKeyOf(TODAY)),
+        fetchEmployeeMonth(monthKeyOf(prevMonthDate))
+      ]);
+      renderDateStrip();
+      loadDay();
+      renderWeekStrip();
+    })();
+    loadProjectsFromBackend();
+    </script>
+    </body>
+    </html>
