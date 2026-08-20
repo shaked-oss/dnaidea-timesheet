@@ -114,6 +114,7 @@ td.num, th.num{ font-family:'IBM Plex Mono',monospace; text-align:left; }
   <div class="tabs">
     <div class="tab active" data-panel="payroll">הכנה לשכר</div>
     <div class="tab" data-panel="projects">פילוח לפי פרויקטים</div>
+    <div class="tab" data-panel="range">טווח מצטבר ועלויות</div>
   </div>
 
   <!-- PAYROLL PANEL -->
@@ -159,18 +160,91 @@ td.num, th.num{ font-family:'IBM Plex Mono',monospace; text-align:left; }
       <div id="projectsBody"></div>
     </div>
   </div>
+
+  <!-- RANGE / PROFITABILITY PANEL -->
+  <div id="rangePanel" class="panel">
+    <div class="card">
+      <div class="card-head">
+        <h3>בחר טווח חודשים</h3>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px">
+        <div>
+          <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px">מחודש</label>
+          <input type="month" id="rangeFrom" style="border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px">עד חודש</label>
+          <input type="month" id="rangeTo" style="border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px">
+        </div>
+        <button class="btn" id="rangeCalcBtn">חשב טווח</button>
+      </div>
+      <div class="footnote" style="text-align:right;margin-top:6px">בוחר טווח רחב יותר עלול לקחת כמה שניות — הנתונים נמשכים חודש-חודש מה-Sheet.</div>
+    </div>
+
+    <div id="rangeResults" style="display:none">
+      <div class="summary-row" id="rangeSummary"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>עלות ושעות מצטברות לפי עובד</h3>
+          <button class="btn secondary" id="rangeExportBtn">⭳ ייצוא ל-CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table id="rangeEmpTable">
+            <thead>
+              <tr>
+                <th>עובד</th>
+                <th class="num">שעות סה"כ</th>
+                <th class="num">ממוצע שעות/חודש</th>
+                <th class="num">עלות שכר משוערת ₪</th>
+                <th class="num">נסיעות והחזרים ₪</th>
+                <th class="num">סה"כ עלות ₪</th>
+              </tr>
+            </thead>
+            <tbody id="rangeEmpBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>עלות פרויקטים (מבוסס שעות עבודה בטווח)</h3>
+        </div>
+        <div class="footnote" style="text-align:right;margin:-4px 0 12px">
+          <b>הערה:</b> "תקציב" ו"רווח/הפסד" מוצגים רק לפרויקטים שמולאה להם עמודת "היקף תקציבי" בטאב פרויקטים. עבור פרויקטים ללא תקציב מוגדר מוצג "—".
+        </div>
+        <div class="table-wrap">
+          <table id="rangeProjTable">
+            <thead>
+              <tr>
+                <th>פרויקט</th>
+                <th class="num">שעות</th>
+                <th class="num">מס' עובדים</th>
+                <th class="num">עלות שכר משוערת ₪</th>
+                <th class="num">תקציב ₪</th>
+                <th class="num">רווח/הפסד ₪</th>
+              </tr>
+            </thead>
+            <tbody id="rangeProjBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
 const BACKEND_URL = "https://script.google.com/a/macros/dnaidea.co.il/s/AKfycbzqgObQSV0MwWo9JWMr6u19gAWxsRwaxHcirAud76XXc-ynceuNRBW3NTTwOFxxE096dQ/exec";
 const ADMIN_PASSWORD = "dnaidea2026"; // נוחות בלבד, לא אבטחה אמיתית
 const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+const STANDARD_MONTHLY_HOURS = 182; // להערכת "עלות שעתית אפקטיבית" לעובדים גלובליים בלבד
 
 let currentDate = new Date();
 let cachedData = null; // {employees, timesheet} for the currently loaded month
 let cachedMonthKey = null;
 
 function monthKeyOf(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+
 
 // ---- lock screen ----
 document.getElementById('pwBtn').onclick = tryUnlock;
@@ -404,6 +478,178 @@ document.getElementById('exportBtn').onclick = () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = `שכר_DNAidea_${cachedMonthKey}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// ---- RANGE / CUMULATIVE VIEW ----
+(function initRangeDefaults(){
+  const to = new Date();
+  const from = new Date(); from.setMonth(from.getMonth()-2);
+  document.getElementById('rangeFrom').value = monthKeyOf(from);
+  document.getElementById('rangeTo').value = monthKeyOf(to);
+})();
+
+function monthsBetween(fromKey, toKey){
+  const [fy,fm] = fromKey.split('-').map(Number);
+  const [ty,tm] = toKey.split('-').map(Number);
+  const months = [];
+  let y=fy, m=fm;
+  while(y<ty || (y===ty && m<=tm)){
+    months.push(`${y}-${String(m).padStart(2,'0')}`);
+    m++; if(m>12){ m=1; y++; }
+    if(months.length>36) break; // safety cap
+  }
+  return months;
+}
+
+let lastRangeEmpRows = [];
+
+document.getElementById('rangeCalcBtn').onclick = async () => {
+  const fromKey = document.getElementById('rangeFrom').value;
+  const toKey = document.getElementById('rangeTo').value;
+  if(!fromKey || !toKey) return;
+  const months = monthsBetween(fromKey, toKey);
+  const btn = document.getElementById('rangeCalcBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = `טוען ${months.length} חודשים…`;
+  document.getElementById('rangeResults').style.display = 'none';
+
+  try {
+    const [monthDataList, projectsList] = await Promise.all([
+      Promise.all(months.map(mk => fetch(`${BACKEND_URL}?action=getMonthData&month=${mk}`).then(r=>r.json()))),
+      fetch(`${BACKEND_URL}?action=getProjects`).then(r=>r.json())
+    ]);
+    const budgetIndex = {};
+    (Array.isArray(projectsList) ? projectsList : []).forEach(p => {
+      const b = parseFloat(p.budget);
+      if(!isNaN(b) && b>0) budgetIndex[p.name] = b;
+    });
+
+    // employees list — use the most recent month's employee roster (rates may change over time; this is a snapshot)
+    const latestEmployees = monthDataList[monthDataList.length-1].employees.filter(e=>e.active);
+    const empIndex = {};
+    latestEmployees.forEach(e=>{ empIndex[e.name] = e; });
+
+    const empAgg = {}; // name -> {hours, travelPay, transit, expense, monthsSeen:Set}
+    const projAgg = {}; // project -> {hours, employees:Set}
+
+    monthDataList.forEach(monthData => {
+      const rows = monthData.timesheet;
+      const byEmpDate = {}; // for dedupe of km/transit/expense per employee per date
+      rows.forEach(r => {
+        const emp = r.employee;
+        if(!empAgg[emp]) empAgg[emp] = { hours:0, travelKm:0, transit:0, expense:0, monthsSeen:new Set() };
+        empAgg[emp].monthsSeen.add(monthKeyFromDate(r.date));
+        const dedupeKey = emp+'|'+r.date;
+        if(!byEmpDate[dedupeKey]){
+          byEmpDate[dedupeKey] = true;
+          empAgg[emp].travelKm += parseFloat(r.km)||0;
+          empAgg[emp].transit += parseFloat(r.transit)||0;
+          empAgg[emp].expense += parseFloat(r.expense)||0;
+        }
+        if(r.dayType==='work'){
+          const h = parseFloat(r.hours)||0;
+          empAgg[emp].hours += h;
+          if(r.project){
+            if(!projAgg[r.project]) projAgg[r.project] = { hours:0, employees:new Set(), cost:0 };
+            projAgg[r.project].hours += h;
+            projAgg[r.project].employees.add(emp);
+            const empInfo = empIndex[emp];
+            const rate = empInfo ? parseFloat(empInfo.rate)||0 : 0;
+            const effRate = empInfo && empInfo.type==='שעתי' ? rate : (rate / STANDARD_MONTHLY_HOURS);
+            projAgg[r.project].cost += h * effRate;
+          }
+        }
+      });
+    });
+
+    function monthKeyFromDate(d){ return d.slice(0,7); }
+
+    // render employee table
+    const tbody = document.getElementById('rangeEmpBody');
+    tbody.innerHTML = '';
+    let grandHours=0, grandCost=0, grandTravel=0;
+    lastRangeEmpRows = [];
+    latestEmployees.forEach(emp => {
+      const a = empAgg[emp.name] || { hours:0, travelKm:0, transit:0, expense:0, monthsSeen:new Set() };
+      const rate = parseFloat(emp.rate)||0;
+      const kmRate = parseFloat(emp.kmRate)||0;
+      const isHourly = emp.type==='שעתי';
+      const monthsActive = Math.max(1, a.monthsSeen.size);
+      const laborCost = isHourly ? a.hours * rate : rate * monthsActive;
+      const travelCost = a.travelKm*kmRate + a.transit + a.expense;
+      const total = laborCost + travelCost;
+      grandHours += a.hours; grandCost += laborCost; grandTravel += travelCost;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="emp-name">${emp.name}</span><span class="emp-type">${emp.type}</span></td>
+        <td class="num">${fmtNum(a.hours)}</td>
+        <td class="num">${fmtNum(a.hours/monthsActive)}</td>
+        <td class="num">${fmtMoney(laborCost)}</td>
+        <td class="num">${fmtMoney(travelCost)}</td>
+        <td class="num">${fmtMoney(total)}</td>
+      `;
+      tbody.appendChild(tr);
+      lastRangeEmpRows.push({ name:emp.name, type:emp.type, hours:fmtNum(a.hours), avgHours:fmtNum(a.hours/monthsActive), laborCost:Math.round(laborCost), travelCost:Math.round(travelCost), total:Math.round(total) });
+    });
+
+    document.getElementById('rangeSummary').innerHTML = `
+      <div class="stat-chip">טווח<b style="font-size:13px">${months.length} חודשים</b></div>
+      <div class="stat-chip">סה"כ שעות<b>${fmtNum(grandHours)}</b></div>
+      <div class="stat-chip">סה"כ עלות שכר משוערת<b>${fmtMoney(grandCost)}</b></div>
+      <div class="stat-chip">סה"כ נסיעות והחזרים<b>${fmtMoney(grandTravel)}</b></div>
+    `;
+
+    // render project table
+    const projBody = document.getElementById('rangeProjBody');
+    const projSorted = Object.entries(projAgg).sort((a,b)=>b[1].cost-a[1].cost);
+    projBody.innerHTML = projSorted.length ? projSorted.map(([name,p])=>{
+      const budget = budgetIndex[name];
+      const hasBudget = budget !== undefined;
+      const margin = hasBudget ? budget - p.cost : null;
+      const marginHtml = hasBudget
+        ? `<span class="flag ${margin>=0?'ok':'warn'}">${fmtMoney(margin)}</span>`
+        : '—';
+      return `
+      <tr>
+        <td>${name}</td>
+        <td class="num">${fmtNum(p.hours)}</td>
+        <td class="num">${p.employees.size}</td>
+        <td class="num">${fmtMoney(p.cost)}</td>
+        <td class="num">${hasBudget ? fmtMoney(budget) : '—'}</td>
+        <td class="num">${marginHtml}</td>
+      </tr>
+    `;}).join('') : '<tr><td colspan="6"><div class="empty-state">אין נתוני עבודה בטווח שנבחר</div></td></tr>';
+
+    document.getElementById('rangeResults').style.display = 'block';
+  } catch(err){
+    console.error(err);
+    alert('שגיאה בטעינת נתוני הטווח: ' + (err.message||''));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+};
+
+document.getElementById('rangeExportBtn').onclick = () => {
+  if(!lastRangeEmpRows.length) return;
+  const fromKey = document.getElementById('rangeFrom').value;
+  const toKey = document.getElementById('rangeTo').value;
+  const headers = ['שם עובד','סוג העסקה','שעות סה"כ','ממוצע שעות לחודש','עלות שכר משוערת ₪','נסיעות והחזרים ₪','סה"כ עלות ₪'];
+  const lines = [headers.join(',')];
+  lastRangeEmpRows.forEach(r=>{
+    lines.push([r.name,r.type,r.hours,r.avgHours,r.laborCost,r.travelCost,r.total].map(v=>`"${v}"`).join(','));
+  });
+  const csv = '\uFEFF' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `טווח_מצטבר_DNAidea_${fromKey}_${toKey}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
