@@ -33,7 +33,11 @@
     .tabs{ display:flex; gap:6px; margin:14px 0 4px; background:#EFEADB; border-radius:11px; padding:4px; }
     .tab{ flex:1; text-align:center; padding:9px 0; border-radius:8px; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
     .tab.active{ background:var(--card); color:var(--accent-dark); box-shadow:var(--shadow); }
-    .date-strip{ display:flex; gap:8px; overflow-x:auto; padding:14px 2px 6px; scrollbar-width:none; }
+    .date-strip-wrap{ display:flex; align-items:center; gap:4px; }
+    .date-strip{ display:flex; gap:8px; overflow-x:auto; padding:14px 2px 6px; scrollbar-width:none; flex:1; min-width:0; }
+    .date-nav-btn{ flex-shrink:0; width:28px; height:28px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--accent-dark); font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .date-nav-btn:hover{ background:#FCFAF5; border-color:var(--accent); }
+    @media (max-width: 520px){ .date-nav-btn{ display:none; } }
     .date-strip::-webkit-scrollbar{ display:none; }
     .day-pill{ flex:0 0 auto; width:52px; padding:9px 0 8px; border-radius:12px; border:1px solid var(--line); background:var(--card); text-align:center; cursor:pointer; transition:all .15s ease; }
     .day-pill:hover{ border-color:var(--accent); }
@@ -70,6 +74,9 @@
     .mini-stepper{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
     .mini-stepbtn{ width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:#FCFAF5; font-size:16px; color:var(--accent-dark); cursor:pointer; display:flex; align-items:center; justify-content:center; }
     .mini-hours{ font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; min-width:30px; text-align:center; }
+    .mini-hours-input{ font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; width:42px; text-align:center; border:1px solid var(--line); border-radius:6px; padding:4px 2px; outline:none; -moz-appearance:textfield; }
+    .mini-hours-input:focus{ border-color:var(--accent); }
+    .mini-hours-input::-webkit-outer-spin-button, .mini-hours-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
     .row-del{ background:none; border:none; color:var(--muted); font-size:15px; cursor:pointer; flex-shrink:0; padding:2px 4px; }
     .row-del:hover{ color:var(--danger); }
     .add-row-btn{ background:none; border:1px dashed var(--line); color:var(--accent-dark); font-size:12.5px; font-weight:600; border-radius:10px; padding:9px; cursor:pointer; margin:4px 0 18px; width:100%; }
@@ -169,7 +176,11 @@
     </div>
     <!-- DAY VIEW -->
     <div id="dayView" class="active">
+    <div class="date-strip-wrap">
+    <button class="date-nav-btn" id="dateStripPrev" aria-label="גלול אחורה">‹</button>
     <div class="date-strip" id="dateStrip"></div>
+    <button class="date-nav-btn" id="dateStripNext" aria-label="גלול קדימה">›</button>
+    </div>
     <div class="card">
     <div class="field-label">סוג היום</div>
     <div class="seg-row" id="segRow">
@@ -308,7 +319,8 @@
     }
     const DOW = ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"];
     const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
-    function fmt(d){ return d.toISOString().slice(0,10); }
+    function fmt(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
+    function parseLocalDate(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
     function todayMid(){ const t=new Date(); t.setHours(0,0,0,0); return t; }
     const TODAY = todayMid();
     const records = {};
@@ -326,6 +338,8 @@
       };
     });
     const dateStrip = document.getElementById('dateStrip');
+    document.getElementById('dateStripPrev').onclick = () => dateStrip.scrollBy({ left: -150, behavior: 'smooth' });
+    document.getElementById('dateStripNext').onclick = () => dateStrip.scrollBy({ left: 150, behavior: 'smooth' });
     function renderDateStrip(){
       dateStrip.innerHTML = "";
       for(let i=0;i<21;i++){
@@ -348,7 +362,7 @@
         pill.onclick = () => { selectedDate = key; loadDay(); renderDateStrip(); };
         dateStrip.appendChild(pill);
       }
-      document.getElementById('selDateLbl').textContent = new Date(selectedDate).toLocaleDateString('he-IL',{weekday:'long', day:'numeric', month:'long'});
+      document.getElementById('selDateLbl').textContent = parseLocalDate(selectedDate).toLocaleDateString('he-IL',{weekday:'long', day:'numeric', month:'long'});
     }
     const segRow = document.getElementById('segRow');
     let currentType = 'work';
@@ -373,7 +387,7 @@
         <div class="proj-pick ${row.project ? '' : 'placeholder'}" data-idx="${idx}">${row.project || 'בחר פרויקט…'}</div>
         <div class="mini-stepper">
         <button class="mini-stepbtn minus" data-idx="${idx}">–</button>
-        <div class="mini-hours mono">${row.hours.toFixed(1).replace(/\.0$/,'')}</div>
+        <input class="mini-hours-input mono" type="number" inputmode="decimal" step="0.5" min="0" max="24" data-idx="${idx}" value="${row.hours.toFixed(1).replace(/\.0$/,'')}">
         <button class="mini-stepbtn plus" data-idx="${idx}">+</button>
         </div>
         ${projRowsData.length>1 ? `<button class="row-del" data-idx="${idx}">✕</button>` : ''}
@@ -382,7 +396,11 @@
       });
       projRowsEl.querySelectorAll('.proj-pick').forEach(elx=>{ elx.onclick = () => openModal(parseInt(elx.dataset.idx)); });
       projRowsEl.querySelectorAll('.minus').forEach(b=> b.onclick = () => { projRowsData[b.dataset.idx].hours = Math.max(0, projRowsData[b.dataset.idx].hours-0.5); renderProjRows(); });
-      projRowsEl.querySelectorAll('.plus').forEach(b=> b.onclick = () => { projRowsData[b.dataset.idx].hours = Math.min(12, projRowsData[b.dataset.idx].hours+0.5); renderProjRows(); });
+      projRowsEl.querySelectorAll('.plus').forEach(b=> b.onclick = () => { projRowsData[b.dataset.idx].hours = Math.min(24, projRowsData[b.dataset.idx].hours+0.5); renderProjRows(); });
+      projRowsEl.querySelectorAll('.mini-hours-input').forEach(inp=>{
+        inp.onchange = () => { const v=Math.max(0, Math.min(24, parseFloat(inp.value)||0)); projRowsData[inp.dataset.idx].hours = v; renderProjRows(); };
+        inp.onclick = (e) => e.stopPropagation();
+      });
       projRowsEl.querySelectorAll('.row-del').forEach(b=> b.onclick = () => { projRowsData.splice(b.dataset.idx,1); renderProjRows(); });
     }
     document.getElementById('addRowBtn').onclick = () => { projRowsData.push({project:null, hours:0}); renderProjRows(); };
@@ -544,7 +562,7 @@
   const weekBars = document.getElementById('weekBars');
   const weekTotal = document.getElementById('weekTotal');
   function renderWeekStrip(){
-  const sel = new Date(selectedDate);
+  const sel = parseLocalDate(selectedDate);
   const sunday = new Date(sel); sunday.setDate(sel.getDate()-sel.getDay());
   weekBars.innerHTML = "";
   let total = 0;
