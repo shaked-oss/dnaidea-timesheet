@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>פאנל מכירות — DNAidea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF7F0; --card:#FFFFFF; --ink:#212B24; --ink-soft:#3E4A41;
+  --muted:#948F7F; --line:#E3DCC9; --accent:#3D6656; --accent-dark:#2B4A3E;
+  --accent-warm:#C98A46; --danger:#B5533D;
+  --shadow: 0 1px 2px rgba(33,43,36,0.04), 0 8px 24px rgba(33,43,36,0.06);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background: radial-gradient(circle at 15% 8%, rgba(61,102,86,0.05), transparent 40%), var(--paper);
+  color:var(--ink); font-family:'Heebo', sans-serif; min-height:100vh;
+}
+.mono{ font-family:'IBM Plex Mono', monospace; }
+/* ---- lock screen ---- */
+#lockScreen{ position:fixed; inset:0; background:var(--paper); z-index:500; display:flex; align-items:center; justify-content:center; padding:20px; }
+.lock-card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:32px 28px; max-width:340px; width:100%; text-align:center; box-shadow:var(--shadow); }
+.lock-card .eyebrow{ font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.14em; color:var(--accent); text-transform:uppercase; margin-bottom:8px; }
+.lock-card h2{ font-family:'Frank Ruhl Libre', serif; font-size:20px; margin:0 0 18px; }
+.lock-card input{ width:100%; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:15px; text-align:center; margin-bottom:12px; outline:none; font-family:'IBM Plex Mono',monospace; letter-spacing:0.2em; }
+.lock-card input:focus{ border-color:var(--accent); }
+.lock-card button{ width:100%; background:var(--accent-dark); color:#fff; border:none; border-radius:10px; padding:12px; font-weight:700; font-size:14px; cursor:pointer; }
+.lock-card button:hover{ background:var(--accent); }
+.lock-err{ color:var(--danger); font-size:12.5px; margin-top:10px; display:none; }
+/* ---- app shell ---- */
+#app{ display:none; max-width:1500px; margin:0 auto; padding:24px 20px 60px; }
+.topbar{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; margin-bottom:20px; }
+.eyebrow{ font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.14em; color:var(--accent); text-transform:uppercase; display:flex; align-items:center; gap:8px; }
+.eyebrow::before{ content:""; width:6px;height:6px;border-radius:50%; background:var(--accent); display:inline-block; }
+h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; margin:6px 0 0; }
+.btn{ background:var(--accent-dark); color:#fff; border:none; border-radius:9px; padding:9px 16px; font-weight:600; font-size:12.5px; cursor:pointer; }
+.btn:hover{ background:var(--accent); }
+.btn.secondary{ background:#FCFAF5; color:var(--accent-dark); border:1px solid var(--line); }
+.summary-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+.stat-chip{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:9px 14px; font-size:12px; color:var(--ink-soft); box-shadow:var(--shadow); }
+.stat-chip b{ font-family:'IBM Plex Mono',monospace; color:var(--ink); font-size:14px; display:block; margin-top:2px; }
+.loading{ text-align:center; padding:60px 20px; color:var(--muted); font-size:13px; }
+/* ---- kanban ---- */
+.board{ display:flex; gap:14px; overflow-x:auto; padding-bottom:12px; align-items:flex-start; }
+.col{ background:#F1EEE3; border-radius:14px; padding:10px; min-width:260px; max-width:260px; flex-shrink:0; }
+.col-head{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px 12px; }
+.col-head .name{ font-weight:700; font-size:12.5px; }
+.col-head .count{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); background:var(--card); border-radius:20px; padding:2px 8px; }
+.col-body{ display:flex; flex-direction:column; gap:8px; min-height:80px; }
+.col-body.drag-over{ background:rgba(61,102,86,0.08); border-radius:10px; }
+.card-item{ background:var(--card); border:1px solid var(--line); border-right:3px solid var(--accent); border-radius:10px; padding:11px 12px; box-shadow:var(--shadow); cursor:grab; font-size:12.5px; line-height:1.5; }
+.card-item.dragging{ opacity:0.4; }
+.card-item .lead-name{ font-weight:700; font-size:13px; margin-bottom:6px; }
+.card-item .lead-meta{ display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.card-item .tag{ font-size:10px; font-weight:600; padding:2px 7px; border-radius:20px; background:#EDF3F0; color:var(--accent-dark); }
+.card-item .tag.budget{ background:#FBF0E2; color:var(--accent-warm); }
+.card-item .tag.followup{ background:#F3E5E1; color:var(--danger); }
+.card-item .owner{ color:var(--muted); font-size:11px; }
+.empty-col{ text-align:center; color:var(--muted); font-size:11px; padding:14px 4px; }
+.footnote{ margin-top:20px; text-align:center; font-size:11px; color:var(--muted); line-height:1.6; }
+@media (max-width: 720px){
+  h1{ font-size:21px; }
+}
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div class="lock-card">
+    <div class="eyebrow">DNAidea · פאנל מכירות</div>
+    <h2>גישה מוגבלת</h2>
+    <input type="password" id="pwInput" placeholder="סיסמה" maxlength="30">
+    <button id="pwBtn">כניסה</button>
+    <div class="lock-err" id="pwErr">סיסמה שגויה, נסה שוב</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div>
+      <div class="eyebrow">DNAidea · פאנל מכירות</div>
+      <h1>לידים ופרויקטים בתהליך</h1>
+    </div>
+    <button class="btn secondary" id="refreshBtn">⟳ רענון</button>
+  </div>
+
+  <div class="summary-row" id="summaryRow"></div>
+
+  <div id="boardWrap">
+    <div class="loading" id="loadingMsg">טוען נתונים…</div>
+    <div class="board" id="board" style="display:none"></div>
+  </div>
+
+  <div class="footnote">גרור כרטיס בין עמודות כדי לעדכן את השלב — העדכון נשמר ישירות ב-Sheet ונרשם ביומן הפעילות.</div>
+</div>
+
+<script>
+const BACKEND_URL = "https://script.google.com/a/macros/dnaidea.co.il/s/AKfycbzqgObQSV0MwWo9JWMr6u19gAWxsRwaxHcirAud76XXc-ynceuNRBW3NTTwOFxxE096dQ/exec";
+const ADMIN_PASSWORD = "dnaidea2026"; // נוחות בלבד, לא אבטחה אמיתית
+
+const STAGES = [
+  { id: 'פיתוח עסקי/שת"פים', name: 'פיתוח עסקי / שת״פים' },
+  { id: 'חם', name: 'חם' },
+  { id: 'פושר', name: 'פושר' },
+  { id: 'פוטנציאל', name: 'פוטנציאל' },
+  { id: 'באוויר', name: 'באוויר' },
+];
+
+// ---- lock screen ----
+document.getElementById('pwBtn').onclick = tryUnlock;
+document.getElementById('pwInput').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
+function tryUnlock(){
+  const val = document.getElementById('pwInput').value;
+  if(val === ADMIN_PASSWORD){
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadLeads();
+  } else {
+    document.getElementById('pwErr').style.display = 'block';
+  }
+}
+
+let leads = [];
+let draggedLeadName = null;
+
+function fmtDate(s){
+  if(!s) return '';
+  const d = new Date(s);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('he-IL', { day:'numeric', month:'numeric' });
+}
+
+async function loadLeads(){
+  document.getElementById('loadingMsg').style.display = 'block';
+  document.getElementById('board').style.display = 'none';
+  try {
+    const res = await fetch(`${BACKEND_URL}?action=getLeads`);
+    const data = await res.json();
+    if(!Array.isArray(data)) throw new Error(data.error || 'שגיאה בטעינה');
+    leads = data;
+    renderBoard();
+    renderSummary();
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('board').style.display = 'flex';
+  } catch(err){
+    console.error(err);
+    document.getElementById('loadingMsg').textContent = 'שגיאה בטעינת נתונים — נסה שוב.';
+  }
+}
+
+function renderSummary(){
+  const row = document.getElementById('summaryRow');
+  row.innerHTML = `
+    <div class="stat-chip">סה"כ לידים<b>${leads.length}</b></div>
+    ${STAGES.map(s => `<div class="stat-chip">${s.name}<b>${leads.filter(l=>l.status===s.id).length}</b></div>`).join('')}
+  `;
+}
+
+function renderBoard(){
+  const board = document.getElementById('board');
+  board.innerHTML = STAGES.map(stage => {
+    const stageLeads = leads.filter(l => l.status === stage.id);
+    return `
+      <div class="col">
+        <div class="col-head">
+          <span class="name">${stage.name}</span>
+          <span class="count mono">${stageLeads.length}</span>
+        </div>
+        <div class="col-body" data-stage="${stage.id}">
+          ${stageLeads.length ? stageLeads.map(l => `
+            <div class="card-item" draggable="true" data-name="${l.name.replace(/"/g,'&quot;')}">
+              <div class="lead-name">${l.name}</div>
+              ${l.owner ? `<div class="owner">👤 ${l.owner}</div>` : ''}
+              <div class="lead-meta">
+                ${l.budget ? `<span class="tag budget">${l.budget}</span>` : ''}
+                ${l.winProb ? `<span class="tag">${l.winProb}</span>` : ''}
+                ${l.followUp ? `<span class="tag followup">⏰ ${fmtDate(l.followUp)}</span>` : ''}
+              </div>
+            </div>
+          `).join('') : '<div class="empty-col">אין לידים</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  board.querySelectorAll('.card-item').forEach(el => {
+    el.addEventListener('dragstart', () => {
+      draggedLeadName = el.dataset.name;
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      draggedLeadName = null;
+    });
+  });
+
+  board.querySelectorAll('.col-body').forEach(colBody => {
+    colBody.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      colBody.classList.add('drag-over');
+    });
+    colBody.addEventListener('dragleave', () => {
+      colBody.classList.remove('drag-over');
+    });
+    colBody.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      colBody.classList.remove('drag-over');
+      if(!draggedLeadName) return;
+      const newStatus = colBody.dataset.stage;
+      const lead = leads.find(l => l.name === draggedLeadName);
+      if(!lead || lead.status === newStatus) return;
+      const oldStatus = lead.status;
+      lead.status = newStatus; // optimistic update
+      renderBoard();
+      renderSummary();
+      try {
+        const res = await fetch(BACKEND_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action:'updateLeadStatus', name: lead.name, newStatus, owner: lead.owner })
+        });
+        const result = await res.json();
+        if(result.error) throw new Error(result.error);
+      } catch(err){
+        console.error('עדכון סטטוס נכשל', err);
+        lead.status = oldStatus; // revert on failure
+        renderBoard();
+        renderSummary();
+        alert('עדכון הסטטוס נכשל — נסה שוב.');
+      }
+    });
+  });
+}
+
+document.getElementById('refreshBtn').onclick = loadLeads;
+</script>
+</body>
+</html>
