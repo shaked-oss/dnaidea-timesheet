@@ -61,6 +61,22 @@ h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; marg
 .card-item .owner{ color:var(--muted); font-size:11px; }
 .empty-col{ text-align:center; color:var(--muted); font-size:11px; padding:14px 4px; }
 .footnote{ margin-top:20px; text-align:center; font-size:11px; color:var(--muted); line-height:1.6; }
+/* ---- modals ---- */
+.modal-bg{ position:fixed; inset:0; background:rgba(33,43,36,0.45); display:none; align-items:center; justify-content:center; z-index:200; padding:20px; }
+.modal-bg.open{ display:flex; }
+.modal{ background:var(--card); border-radius:16px; padding:22px 22px 18px; max-width:420px; width:100%; max-height:85vh; overflow-y:auto; box-shadow:var(--shadow); }
+.modal h3{ font-family:'Frank Ruhl Libre',serif; font-size:17px; margin:0 0 14px; }
+.field-row{ margin-bottom:12px; }
+.field-row label{ display:block; font-size:11.5px; color:var(--muted); margin-bottom:4px; }
+.field-row input, .field-row select{ width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 11px; font-size:13px; font-family:'Heebo',sans-serif; outline:none; }
+.field-row input:focus, .field-row select:focus{ border-color:var(--accent); }
+.modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+.col-manage-row{ display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line); border-radius:9px; margin-bottom:6px; background:#FCFAF5; }
+.col-manage-row .stage-name{ flex:1; font-size:13px; font-weight:600; }
+.col-manage-row .lead-count{ font-size:10.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+.col-manage-row button{ background:none; border:none; cursor:pointer; font-size:14px; color:var(--muted); padding:2px 6px; }
+.col-manage-row button:hover{ color:var(--accent-dark); }
+.col-manage-row button.remove:hover{ color:var(--danger); }
 @media (max-width: 720px){
   h1{ font-size:21px; }
 }
@@ -84,7 +100,11 @@ h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; marg
       <div class="eyebrow">DNAidea · פאנל מכירות</div>
       <h1>לידים ופרויקטים בתהליך</h1>
     </div>
-    <button class="btn secondary" id="refreshBtn">⟳ רענון</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn secondary" id="manageColsBtn">⚙ נהל עמודות</button>
+      <button class="btn" id="newLeadBtn">+ ליד חדש</button>
+      <button class="btn secondary" id="refreshBtn">⟳ רענון</button>
+    </div>
   </div>
 
   <div class="summary-row" id="summaryRow"></div>
@@ -94,29 +114,79 @@ h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; marg
     <div class="board" id="board" style="display:none"></div>
   </div>
 
-  <div class="footnote">גרור כרטיס בין עמודות כדי לעדכן את השלב — העדכון נשמר ישירות ב-Sheet ונרשם ביומן הפעילות.</div>
+  <div class="footnote">גרור כרטיס בין גמץודות כדי לגדכן השלב — העדכון נשמר ישירות ב-Sheet ונרשם ביומן הפעילות.</div>
 </div>
+
+<!-- NEW LEAD MODAL -->
+<div class="modal-bg" id="newLeadModalBg">
+  <div class="modal">
+    <h3>ליד חדש</h3>
+    <div class="field-row"><label>שם הליד *</label><input type="text" id="nlName" placeholder="שם הפרויקט / הליד"></div>
+    <div class="field-row"><label>בעלים</label><input type="text" id="nlOwner" placeholder="שם העובד האחראי"></div>
+    <div class="field-row"><label>שלב</label><select id="nlStatus"></select></div>
+    <div class="field-row"><label>היקף תקציבי</label><input type="text" id="nlBudget" placeholder="לדוגמה 50-100K"></div>
+    <div class="field-row"><label>סיכוי זכייה</label><input type="text" id="nlWinProb" placeholder="Low / Medium / High"></div>
+    <div class="field-row"><label>פולו-אפ</label><input type="date" id="nlFollowUp"></div>
+    <div class="field-row"><label>הערות</label><input type="text" id="nlNotes"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="nlCancelBtn">ביטול</button>
+      <button class="btn" id="nlSaveBtn">✓ הוסף ליד</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE COLUMNS MODAL -->
+<div class="modal-bg" id="colsModalBg">
+  <div class="modal">
+    <h3>ניהול עמודות (שלבים)</h3>
+    <div id="colsList"></div>
+    <div class="field-row" style="margin-top:12px"><label>הוספת שלב חדש</label>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="newColName" placeholder="שם השלב החדש" style="flex:1">
+        <button class="btn secondary" id="addColBtn">+ הוסף</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="colsCancelBtn">ביטול</button>
+      <button class="btn" id="colsSaveBtn">✓ שמור שינויים</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 const BACKEND_URL = "https://script.google.com/a/macros/dnaidea.co.il/s/AKfycbzqgObQSV0MwWo9JWMr6u19gAWxsRwaxHcirAud76XXc-ynceuNRBW3NTTwOFxxE096dQ/exec";
 const ADMIN_PASSWORD = "dnaidea2026"; // נוחות בלבד, לא אבטחה אמיתית
 
-const STAGES = [
+let STAGES = [
   { id: 'פיתוח עסקי/שת"פים', name: 'פיתוח עסקי / שת״פים' },
   { id: 'חם', name: 'חם' },
   { id: 'פושר', name: 'פושר' },
   { id: 'פוטנציאל', name: 'פוטנציאל' },
   { id: 'באוויר', name: 'באוויר' },
-];
+]; // ברירת מחדל — יוחלף בטעינה מהשרת
+
+async function loadStages(){
+  try {
+    const res = await fetch(`${BACKEND_URL}?action=getStages`);
+    const data = await res.json();
+    if(Array.isArray(data) && data.length){
+      STAGES = data.map(name => ({ id: name, name: name }));
+    }
+  } catch(err){
+    console.warn('לא הצלחתי לטעון שלבים מהשרת, משתמש בברירת מחדל', err);
+  }
+}
 
 // ---- lock screen ----
 document.getElementById('pwBtn').onclick = tryUnlock;
 document.getElementById('pwInput').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
-function tryUnlock(){
+async function tryUnlock(){
   const val = document.getElementById('pwInput').value;
   if(val === ADMIN_PASSWORD){
     document.getElementById('lockScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
+    await loadStages();
     loadLeads();
   } else {
     document.getElementById('pwErr').style.display = 'block';
@@ -236,6 +306,127 @@ function renderBoard(){
 }
 
 document.getElementById('refreshBtn').onclick = loadLeads;
+
+// ---- NEW LEAD ----
+const newLeadModalBg = document.getElementById('newLeadModalBg');
+document.getElementById('newLeadBtn').onclick = () => {
+  document.getElementById('nlName').value = '';
+  document.getElementById('nlOwner').value = '';
+  document.getElementById('nlBudget').value = '';
+  document.getElementById('nlWinProb').value = '';
+  document.getElementById('nlFollowUp').value = '';
+  document.getElementById('nlNotes').value = '';
+  const sel = document.getElementById('nlStatus');
+  sel.innerHTML = STAGES.map(s => `<option value="${s.id.replace(/"/g,'&quot;')}">${s.name}</option>`).join('');
+  newLeadModalBg.classList.add('open');
+};
+document.getElementById('nlCancelBtn').onclick = () => newLeadModalBg.classList.remove('open');
+newLeadModalBg.onclick = (e) => { if(e.target===newLeadModalBg) newLeadModalBg.classList.remove('open'); };
+document.getElementById('nlSaveBtn').onclick = async () => {
+  const name = document.getElementById('nlName').value.trim();
+  if(!name){ alert('חובה להזין שם ליד'); return; }
+  const btn = document.getElementById('nlSaveBtn');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'שומר…';
+  try {
+    const res = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'addLead',
+        name,
+        owner: document.getElementById('nlOwner').value.trim(),
+        status: document.getElementById('nlStatus').value,
+        budget: document.getElementById('nlBudget').value.trim(),
+        winProb: document.getElementById('nlWinProb').value.trim(),
+        followUp: document.getElementById('nlFollowUp').value,
+        notes: document.getElementById('nlNotes').value.trim(),
+      })
+    });
+    const result = await res.json();
+    if(result.error) throw new Error(result.error);
+    newLeadModalBg.classList.remove('open');
+    await loadLeads();
+  } catch(err){
+    console.error('הוספת ליד נכשלה', err);
+    alert('הוספת הליד נכשלה — נסה שוב.');
+  } finally {
+    btn.disabled = false; btn.textContent = original;
+  }
+};
+
+// ---- MANAGE COLUMNS ----
+const colsModalBg = document.getElementById('colsModalBg');
+let pendingStages = [];
+function renderColsList(){
+  const container = document.getElementById('colsList');
+  container.innerHTML = pendingStages.map((s, idx) => {
+    const count = leads.filter(l => l.status === s.id).length;
+    return `
+    <div class="col-manage-row" data-idx="${idx}">
+      <span class="stage-name">${s.name}</span>
+      <span class="lead-count">${count} לידים</span>
+      <button class="move-up" data-idx="${idx}" ${idx===0?'disabled style="opacity:.3"':''}>▲</button>
+      <button class="move-down" data-idx="${idx}" ${idx===pendingStages.length-1?'disabled style="opacity:.3"':''}>▼</button>
+      <button class="remove" data-idx="${idx}">✕</button>
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.move-up').forEach(b => b.onclick = () => {
+    const i = parseInt(b.dataset.idx);
+    if(i>0){ [pendingStages[i-1], pendingStages[i]] = [pendingStages[i], pendingStages[i-1]]; renderColsList(); }
+  });
+  container.querySelectorAll('.move-down').forEach(b => b.onclick = () => {
+    const i = parseInt(b.dataset.idx);
+    if(i<pendingStages.length-1){ [pendingStages[i+1], pendingStages[i]] = [pendingStages[i], pendingStages[i+1]]; renderColsList(); }
+  });
+  container.querySelectorAll('.remove').forEach(b => b.onclick = () => {
+    const i = parseInt(b.dataset.idx);
+    const count = leads.filter(l => l.status === pendingStages[i].id).length;
+    if(count > 0){ alert(`אי אפשר למחוק את "${pendingStages[i].name}" — יש בו ${count} לידים. העבר אותם קודם לעמודה אחרת.`); return; }
+    pendingStages.splice(i, 1);
+    renderColsList();
+  });
+}
+document.getElementById('manageColsBtn').onclick = () => {
+  pendingStages = STAGES.map(s => ({ ...s }));
+  renderColsList();
+  colsModalBg.classList.add('open');
+};
+document.getElementById('colsCancelBtn').onclick = () => colsModalBg.classList.remove('open');
+colsModalBg.onclick = (e) => { if(e.target===colsModalBg) colsModalBg.classList.remove('open'); };
+document.getElementById('addColBtn').onclick = () => {
+  const input = document.getElementById('newColName');
+  const name = input.value.trim();
+  if(!name) return;
+  if(pendingStages.some(s => s.id === name)){ alert('שלב בשם הזה כבר קיים'); return; }
+  pendingStages.push({ id: name, name: name });
+  input.value = '';
+  renderColsList();
+};
+document.getElementById('colsSaveBtn').onclick = async () => {
+  if(!pendingStages.length){ alert('חייב להישאר לפחות שלב אחד'); return; }
+  const btn = document.getElementById('colsSaveBtn');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'שומר…';
+  try {
+    const res = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveStages', stages: pendingStages.map(s => s.id) })
+    });
+    const result = await res.json();
+    if(result.error) throw new Error(result.error);
+    STAGES = pendingStages;
+    colsModalBg.classList.remove('open');
+    renderBoard();
+    renderSummary();
+  } catch(err){
+    console.error('שמירת עמודות נכשלה', err);
+    alert('שמירת השינויים נכשלה — נסה שוב.');
+  } finally {
+    btn.disabled = false; btn.textContent = original;
+  }
+};
 </script>
 </body>
 </html>
