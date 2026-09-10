@@ -59,6 +59,12 @@ h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; marg
 .card-item .tag.budget{ background:#FBF0E2; color:var(--accent-warm); }
 .card-item .tag.followup{ background:#F3E5E1; color:var(--danger); }
 .card-item .owner{ color:var(--muted); font-size:11px; }
+.archive-btn{ display:none; margin-top:8px; width:100%; background:#FCFAF5; border:1px solid var(--line); border-radius:7px; padding:5px 0; font-size:10.5px; color:var(--muted); cursor:pointer; }
+.card-item:hover .archive-btn{ display:block; }
+.archive-btn:hover{ background:#F3E5E1; color:var(--danger); border-color:var(--danger); }
+.archive-row{ padding:10px 12px; border:1px solid var(--line); border-radius:9px; margin-bottom:6px; background:#FCFAF5; }
+.archive-row .name{ font-weight:700; font-size:13px; margin-bottom:4px; }
+.archive-row .meta{ font-size:11px; color:var(--muted); display:flex; gap:8px; flex-wrap:wrap; }
 .empty-col{ text-align:center; color:var(--muted); font-size:11px; padding:14px 4px; }
 .footnote{ margin-top:20px; text-align:center; font-size:11px; color:var(--muted); line-height:1.6; }
 /* ---- modals ---- */
@@ -103,6 +109,7 @@ h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; marg
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn secondary" id="manageColsBtn">⚙ נהל עמודות</button>
       <button class="btn" id="newLeadBtn">+ ליד חדש</button>
+      <button class="btn secondary" id="viewArchiveBtn">📁 ארכיון</button>
       <button class="btn secondary" id="refreshBtn">⟳ רענון</button>
     </div>
   </div>
@@ -114,7 +121,7 @@ h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; marg
     <div class="board" id="board" style="display:none"></div>
   </div>
 
-  <div class="footnote">גרור כרטיס בין גמץודות כדי לגדכן השלב — העדכון נשמר ישירות ב-Sheet ונרשם ביומן הפעילות.</div>
+  <div class="footnote">גרור כרטיס בין עמודות כדי לעדכן את השלב — העדכון נשמר ישירות ב-Sheet ונרשם ביומן הפעילות.</div>
 </div>
 
 <!-- NEW LEAD MODAL -->
@@ -149,6 +156,17 @@ h1{ font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:26px; marg
     <div class="modal-actions">
       <button class="btn secondary" id="colsCancelBtn">ביטול</button>
       <button class="btn" id="colsSaveBtn">✓ שמור שינויים</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW ARCHIVE MODAL -->
+<div class="modal-bg" id="archiveModalBg">
+  <div class="modal" style="max-width:560px">
+    <h3>ארכיון לידים</h3>
+    <div id="archiveList" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="archiveCloseBtn">סגור</button>
     </div>
   </div>
 </div>
@@ -249,6 +267,7 @@ function renderBoard(){
                 ${l.winProb ? `<span class="tag">${l.winProb}</span>` : ''}
                 ${l.followUp ? `<span class="tag followup">⏰ ${fmtDate(l.followUp)}</span>` : ''}
               </div>
+              <button class="archive-btn" data-name="${l.name.replace(/"/g,'&quot;')}" title="העבר לארכיון">🗄 ארכב</button>
             </div>
           `).join('') : '<div class="empty-col">אין לידים</div>'}
         </div>
@@ -427,6 +446,64 @@ document.getElementById('colsSaveBtn').onclick = async () => {
     btn.disabled = false; btn.textContent = original;
   }
 };
+
+// ---- ARCHIVE LEAD (wired after every renderBoard call) ----
+function wireArchiveButtons(){
+  document.querySelectorAll('.archive-btn').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.name;
+      if(!confirm(`להעביר את "${name}" לארכיון? הליד ייעלם מהלוח הפעיל.`)) return;
+      btn.disabled = true;
+      btn.textContent = 'מעביר…';
+      try {
+        const res = await fetch(BACKEND_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'archiveLead', name })
+        });
+        const result = await res.json();
+        if(result.error) throw new Error(result.error);
+        await loadLeads();
+      } catch(err){
+        console.error('ארכוב נכשל', err);
+        alert('ארכוב הליד נכשל — נסה שוב.');
+        btn.disabled = false; btn.textContent = '🗄 ארכב';
+      }
+    };
+  });
+}
+const _origRenderBoard = renderBoard;
+renderBoard = function(){ _origRenderBoard(); wireArchiveButtons(); };
+
+// ---- VIEW ARCHIVE ----
+const archiveModalBg = document.getElementById('archiveModalBg');
+document.getElementById('viewArchiveBtn').onclick = async () => {
+  const list = document.getElementById('archiveList');
+  list.innerHTML = '<div class="loading">טוען…</div>';
+  archiveModalBg.classList.add('open');
+  try {
+    const res = await fetch(`${BACKEND_URL}?action=getArchivedLeads`);
+    const data = await res.json();
+    if(!Array.isArray(data)) throw new Error(data.error || 'שגיאה בטעינה');
+    list.innerHTML = data.length ? data.map(l => `
+      <div class="archive-row">
+        <div class="name">${l.name}</div>
+        <div class="meta">
+          ${l.owner ? `<span>👤 ${l.owner}</span>` : ''}
+          ${l.status ? `<span>שלב אחרון: ${l.status}</span>` : ''}
+          ${l.budget ? `<span>${l.budget}</span>` : ''}
+          ${l.archivedDate ? `<span>אורכב: ${fmtDate(l.archivedDate)}</span>` : ''}
+        </div>
+      </div>
+    `).join('') : '<div class="empty-col">הארכיון ריק</div>';
+  } catch(err){
+    console.error(err);
+    list.innerHTML = '<div class="empty-col">שגיאה בטעינת הארכיון.</div>';
+  }
+};
+document.getElementById('archiveCloseBtn').onclick = () => archiveModalBg.classList.remove('open');
+archiveModalBg.onclick = (e) => { if(e.target===archiveModalBg) archiveModalBg.classList.remove('open'); };
 </script>
 </body>
 </html>
